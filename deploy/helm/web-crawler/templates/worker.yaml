@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-crawler-worker
+  labels:
+    {{- include "web-crawler.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.services.worker.replicas }}
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      {{- include "web-crawler.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "web-crawler.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        {{- include "web-crawler.waitForPostgres" . | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: "{{ .Values.images.worker.repository }}:{{ .Values.images.worker.tag }}"
+          imagePullPolicy: {{ .Values.images.worker.pullPolicy }}
+          ports:
+            - { name: health, containerPort: 8082, protocol: TCP }
+          env:
+            - { name: DB_HOST, value: web-crawler-postgres }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_NAME, value: {{ .Values.postgres.database | quote }} }
+            - { name: DB_USER, value: {{ .Values.postgres.username | quote }} }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.existingSecret }}
+                  key: {{ .Values.postgres.secretPasswordKey }}
+            - { name: WORKER_CONCURRENCY, value: {{ .Values.services.worker.concurrency | quote }} }
+            - { name: CRAWLER_USER_AGENT, value: {{ .Values.crawler.userAgent | quote }} }
+            - { name: CRAWLER_PRODUCT_TOKEN, value: {{ .Values.crawler.productToken | quote }} }
+            - { name: RUST_LOG, value: info }
+          startupProbe:
+            httpGet: { path: /health/ready, port: health }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: { path: /health/ready, port: health }
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /health/live, port: health }
+            periodSeconds: 10
+            timeoutSeconds: 2
+          resources:
+            {{- toYaml .Values.services.worker.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }

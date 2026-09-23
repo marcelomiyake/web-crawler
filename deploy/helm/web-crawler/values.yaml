@@ -1,0 +1,49 @@
+images:
+  api:
+    repository: web-crawler-api
+    tag: dev
+    pullPolicy: IfNotPresent
+  worker:
+    repository: web-crawler-worker
+    tag: dev
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: web-crawler-frontend
+    tag: dev
+    pullPolicy: IfNotPresent
+
+services:
+  api:
+    replicas: 2
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { cpu: 500m, memory: 384Mi }
+  worker:
+    replicas: 2
+    concurrency: 2
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+  frontend:
+    replicas: 2
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 100m, memory: 128Mi }
+
+postgres:
+  image: postgres:17-alpine
+  database: web_crawler
+  username: crawler
+  existingSecret: web-crawler-postgres
+  secretPasswordKey: password
+  storageClassName: standard
+  storageSize: 10Gi
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+crawler:
+  userAgent: "WebCrawler/0.1"
+  productToken: "WebCrawler/0.1"
+
+podAnnotations: {}

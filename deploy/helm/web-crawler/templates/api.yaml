@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-crawler-api
+  labels:
+    {{- include "web-crawler.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.services.api.replicas }}
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      {{- include "web-crawler.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "web-crawler.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        {{- include "web-crawler.waitForPostgres" . | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: "{{ .Values.images.api.repository }}:{{ .Values.images.api.tag }}"
+          imagePullPolicy: {{ .Values.images.api.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 8081, protocol: TCP }
+          env:
+            - { name: LISTEN_ADDR, value: "0.0.0.0:8081" }
+            - { name: DB_HOST, value: web-crawler-postgres }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_NAME, value: {{ .Values.postgres.database | quote }} }
+            - { name: DB_USER, value: {{ .Values.postgres.username | quote }} }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.existingSecret }}
+                  key: {{ .Values.postgres.secretPasswordKey }}
+            - { name: RUST_LOG, value: info }
+          startupProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+          resources:
+            {{- toYaml .Values.services.api.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-crawler-api
+  labels:
+    {{- include "web-crawler.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "web-crawler.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  ports:
+    - { name: http, port: 8081, targetPort: http, protocol: TCP }

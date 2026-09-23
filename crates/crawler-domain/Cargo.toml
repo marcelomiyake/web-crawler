@@ -1,0 +1,13 @@
+[package]
+name = "crawler-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ipnet.workspace = true
+thiserror.workspace = true
+url.workspace = true
+
+[dev-dependencies]
