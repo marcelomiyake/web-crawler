@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = ["crates/crawler-config", "crates/crawler-domain", "crawler-api", "crawler-worker"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.88"
+
+[workspace.dependencies]
+anyhow = "1"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+futures-util = "0.3"
+http = "1"
+ipnet = "2"
+scraper = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", features = ["chrono", "migrate", "postgres", "runtime-tokio-rustls", "uuid"] }
+subtle = "2"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+url = "2"
+uuid = { version = "1", features = ["serde", "v4"] }

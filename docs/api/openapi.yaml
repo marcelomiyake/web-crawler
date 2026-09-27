@@ -1,0 +1,224 @@
+openapi: 3.1.0
+info:
+  title: Web Crawler API
+  version: 1.0.0
+  description: Local-only API for bounded crawl jobs and their escaped HTML source archives.
+servers:
+  - url: /api/v1
+tags:
+  - name: Crawl jobs
+paths:
+  /crawl-jobs:
+    post:
+      tags: [Crawl jobs]
+      operationId: createCrawlJob
+      summary: Create a bounded crawl job
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128, pattern: '^[!-~]+$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCrawlJobRequest' }
+      responses:
+        '202':
+          description: Job was created or the matching idempotent request was replayed.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateCrawlJobResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { description: Request body exceeds 64 KiB. }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '507': { description: The local archive body budget has been reached. }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /crawl-jobs/{job_id}:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Crawl jobs]
+      operationId: getCrawlJob
+      summary: Read crawl state and frontier counts
+      responses:
+        '200':
+          description: Current job state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CrawlJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    delete:
+      tags: [Crawl jobs]
+      operationId: deleteCrawlJob
+      summary: Delete a job and its retained page bodies
+      responses:
+        '204': { description: Job and job-owned data were deleted. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /crawl-jobs/{job_id}/pages:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+    get:
+      tags: [Crawl jobs]
+      operationId: listCrawlPages
+      summary: List page snapshot metadata
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Stable keyset-paginated page list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '507': { description: The local archive body budget has been reached. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /crawl-jobs/{job_id}/pages/{page_id}/content:
+    parameters:
+      - $ref: '#/components/parameters/JobId'
+      - in: path
+        name: page_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Crawl jobs]
+      operationId: getPageContent
+      summary: Get archived source as inert plain text
+      responses:
+        '200':
+          description: Stored source bytes; clients must display them as text.
+          headers:
+            X-Content-Type-Options: { schema: { const: nosniff } }
+          content:
+            text/plain:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /health/live:
+    get:
+      operationId: liveness
+      responses:
+        '204': { description: Process is alive. }
+  /health/ready:
+    get:
+      operationId: readiness
+      responses:
+        '204': { description: PostgreSQL is ready. }
+        '503': { description: Required PostgreSQL dependency is unavailable. }
+components:
+  parameters:
+    JobId:
+      in: path
+      name: job_id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    CreateCrawlJobRequest:
+      type: object
+      additionalProperties: false
+      required: [seeds, allowed_hosts]
+      properties:
+        seeds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string, format: uri, maxLength: 4096 }
+        allowed_hosts:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string, maxLength: 253 }
+        limits:
+          type: object
+          additionalProperties: false
+          properties:
+            max_urls: { type: integer, minimum: 1, maximum: 500 }
+            max_depth: { type: integer, minimum: 0, maximum: 3 }
+    CreateCrawlJobResponse:
+      type: object
+      required: [id, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        status: { const: running }
+        created_at: { type: string, format: date-time }
+    CrawlJob:
+      type: object
+      required: [id, status, max_urls, max_depth, created_at, completed_at, counts]
+      properties:
+        id: { type: string, format: uuid }
+        status: { enum: [running, completed, completed_with_errors] }
+        max_urls: { type: integer }
+        max_depth: { type: integer }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
+        counts: { $ref: '#/components/schemas/FrontierCounts' }
+    FrontierCounts:
+      type: object
+      required: [queued, leased, completed, skipped, failed]
+      properties:
+        queued: { type: integer, minimum: 0 }
+        leased: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+    Page:
+      type: object
+      required: [id, canonical_url, title, http_status, depth, fetched_at]
+      properties:
+        id: { type: string, format: uuid }
+        canonical_url: { type: string, format: uri }
+        title: { type: string }
+        http_status: { type: integer }
+        depth: { type: integer }
+        fetched_at: { type: string, format: date-time }
+    PageList:
+      type: object
+      required: [pages, next_cursor]
+      properties:
+        pages:
+          type: array
+          items: { $ref: '#/components/schemas/Page' }
+        next_cursor: { type: [string, 'null'] }
+    Error:
+      type: object
+      required: [error, request_id]
+      properties:
+        error: { type: string }
+        request_id: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Invalid idempotency key, JSON, or cursor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Idempotency key was reused with a different normalized request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: URL, host, or limits violate the crawler policy.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Job or page does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: The database is unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

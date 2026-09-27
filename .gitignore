@@ -1,0 +1,47 @@
+# Rust build output and generated profiling/coverage data
+/target/
+/debug/
+**/*.rs.bk
+*.pdb
+*.profraw
+*.profdata
+**/mutants.out*/
+
+# Vue, Vite, and Playwright generated output
+/crawler-frontend/node_modules/
+/crawler-frontend/dist/
+/crawler-frontend/coverage/
+/crawler-frontend/playwright-report/
+/crawler-frontend/test-results/
+/crawler-frontend/blob-report/
+**/*.tsbuildinfo
+
+# SonarQube scanner work files (keep checked-in project configuration/scripts)
+/.scannerwork/
+/.sonar/working/
+/.sonar/cache/
+
+# Local environment files and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.p12
+*.pfx
+*.jks
+
+# Local logs, database exports, and packaged Helm charts
+*.log
+*.dump
+*.backup
+*.tgz
+
+# Editor and operating-system temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+__pycache__/
+*.py[cod]

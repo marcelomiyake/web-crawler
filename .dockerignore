@@ -1,0 +1,9 @@
+.git
+.gitignore
+target
+crawler-frontend/node_modules
+crawler-frontend/dist
+crawler-frontend/coverage
+crawler-frontend/playwright-report
+crawler-frontend/test-results
+docs/system-design.docx

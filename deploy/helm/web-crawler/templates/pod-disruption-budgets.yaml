@@ -1,0 +1,16 @@
+{{- range $component := list "api" "worker" "frontend" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-crawler-{{ $component }}
+  labels:
+    {{- include "web-crawler.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "web-crawler.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $component }}
+---
+{{- end }}

@@ -1,0 +1,75 @@
+name: SonarQube Cloud per-microservice analysis
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-microservices-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: SonarCloud - ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: crawler-api
+            service: crawler-api
+            project_key: marcelomiyake_web-crawler_crawler-api
+            coverage_exclusions: ""
+          - component: crawler-worker
+            service: crawler-worker
+            project_key: marcelomiyake_web-crawler_crawler-worker
+            coverage_exclusions: ""
+    env:
+      TEST_DATABASE_URL: postgres://crawler:${{ github.run_id }}@localhost:5432/crawler_test
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: crawler
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: crawler_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U crawler -d crawler_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+      - name: Install Rust coverage tool
+        run: cargo install cargo-llvm-cov --version 0.9.1 --locked
+      - name: Install SonarScanner for Cargo
+        run: cargo install cargo-sonar-scanner --version 1.0.0 --locked
+      - name: Generate ${{ matrix.component }} coverage
+        working-directory: ${{ matrix.service }}
+        run: |
+          mkdir -p target/coverage
+          cargo llvm-cov --lcov --output-path target/coverage/lcov.info -- --test-threads=1
+      - name: Analyze ${{ matrix.component }}
+        working-directory: ${{ matrix.service }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PROJECT_KEY: ${{ matrix.project_key }}
+          COVERAGE_EXCLUSIONS: ${{ matrix.coverage_exclusions }}
+        run: |
+          scanner_args=(
+            --sonar-organization marcelomiyake
+            --sonar-project-key "$PROJECT_KEY"
+            -Dsonar.rust.lcov.reportPaths=target/coverage/lcov.info
+          )
+          if [[ -n "$COVERAGE_EXCLUSIONS" ]]; then
+            scanner_args+=("-Dsonar.coverage.exclusions=$COVERAGE_EXCLUSIONS")
+          fi
+          cargo sonar-scanner "${scanner_args[@]}"
