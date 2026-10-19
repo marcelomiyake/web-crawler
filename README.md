@@ -115,7 +115,7 @@ The [per-service GitHub Actions workflow](.github/workflows/sonarcloud-microserv
 
 - [System design](docs/system-design.md) — requirements, boundaries, API, schema, safety, trade-offs, operations, and acceptance.
 - [OpenAPI contract](docs/api/openapi.yaml) — API paths and payloads.
-- [Agent guidance](AGENTS.md) — DDD/Jev, quality gates, testing, and local Kubernetes workflow.
+- [Agent guidance](AGENTS.md) — DDD and Jev review, quality gates, testing, and local Kubernetes workflow. [Jev](https://docs.typesafe.ai/introduction/coding-agents) is TypeSafe's model for typed rubric scores; its results are advisory, not a release gate.
 - [Frontend design notes](crawler-frontend/DESIGN.md) — interaction model and accessibility.
 
 ## Build, use, and resource prerequisites
