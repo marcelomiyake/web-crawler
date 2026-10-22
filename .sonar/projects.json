@@ -1,0 +1,11 @@
+{
+  "policy": "Use a Sonar project for each real component; retain existing aggregate history.",
+  "projects": [
+    {
+      "component": "crawler-frontend",
+      "directory": "crawler-frontend",
+      "key": "marcelomiyake_web-crawler_crawler-frontend",
+      "kind": "web"
+    }
+  ]
+}
