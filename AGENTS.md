@@ -12,6 +12,7 @@
 - [SonarQube quality and duplication gate](#sonarqube-quality-and-duplication-gate)
 - [Kubernetes and local Kind](#kubernetes-and-local-kind)
 - [Commit messages](#commit-messages)
+- [Releases](#releases)
 
 ## Repository state and sources of truth
 
@@ -140,3 +141,14 @@ Do not label unit tests integration/E2E. Report the exact command and result; te
 ## Commit messages
 
 Follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for every commit. Use `type[optional scope]: description`; place `!` after type/scope for breaking changes and include a `BREAKING CHANGE:` footer. Add a body/other footers where helpful.
+
+## Releases
+
+`.github/workflows/release.yml` runs [release-please](https://github.com/googleapis/release-please) on every push to `main`. From the Conventional Commits merged since the last tag, it keeps one release pull request open, titled `chore: release X.Y.Z`:
+
+- `fix`, `perf` and `revert` make a patch release, `feat` a minor release, and a breaking change (`!`) a major release. The other types release nothing on their own and stay out of the changelog.
+- It writes the version to `version.txt` and adds the release to `CHANGELOG.md`.
+- Merging it tags `vX.Y.Z` and publishes the GitHub release.
+- GitHub runs no workflow on that pull request, because the workflow's own token opened it. The other workflows run on `main` once it merges.
+
+Never change the version or `CHANGELOG.md` by hand. `.release-please-manifest.json` holds the last released version, and `release-please-config.json` the settings. To force a version, add a `Release-As: X.Y.Z` footer to a commit.
