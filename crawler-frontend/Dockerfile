@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:26.13.1-alpine AS builder
 WORKDIR /app
 COPY crawler-frontend/package.json crawler-frontend/package-lock.json ./
 RUN npm ci --ignore-scripts
